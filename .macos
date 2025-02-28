@@ -1,0 +1,162 @@
+#!/bin/bash
+# ~/.macos https://github.com/kentcdodds/dotfiles/blob/main/.macos
+# Modified by Sérgio Freitas
+# Run without downloading:
+# curl https://raw.githubusercontent.com/freitass-ppb/dotfiles/HEAD/.macos | bash
+
+
+# Ensure the script stops if any command fails
+set -e
+
+################################################################################
+#                               Set Super User                                 #
+################################################################################
+# Ask for the administrator password upfront
+sudo -v
+
+# Keep-alive: update existing `sudo` time stamp until `.macos` has finished
+while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+
+################################################################################
+#                                Set Up Software                               #
+################################################################################
+
+SSH_PATH=$HOME/.ssh/work
+
+touch $HOME/.ssh/config
+
+# Set GitHub SSH key
+echo "⏳ Generating GitHub SSH key"
+mkdir -p $SSH_PATH
+ssh-keygen -t ed25519 -C "sergio.freitas@flutteruki.com" -N "" -f $SSH_PATH/github_id_work
+eval "$(ssh-agent -s)"
+printf "
+# Work GitHub account
+Host github.com
+  HostName github.com
+  AddKeysToAgent yes
+  UseKeychain yes
+  IdentityFile $SSH_PATH/github_id_work
+  
+" >> $HOME/.ssh/config
+ssh-add --apple-use-keychain $SSH_PATH/github_id_work
+
+echo "⏳ Authenticating to GitHub"
+gh auth login --hostname github.com --git-protocol ssh
+
+echo "⏳ Requesting GitHub admin public key"
+gh auth refresh -h github.com -s admin:public_key
+
+echo "⏳ Adding public key to GitHub"
+gh ssh-key add $SSH_PATH/github_id_work.pub --title $(hostname)
+
+
+# Set GitLab SSH key
+echo "⏳ Generating GitLab SSH key"
+ssh-keygen -t ed25519 -C "sergio.freitas@flutteruki.com" -N "" -f $SSH_PATH/gitlab_id_work
+eval "$(ssh-agent -s)"
+printf "
+# Work GitLab account
+Host gitlab.app.betfair
+  PreferredAuthentications publickey
+  IdentityFile $SSH_PATH/gitlab_id_work
+  
+" >> $HOME/.ssh/config
+ssh-add --apple-use-keychain $SSH_PATH/gitlab_id_work
+
+#echo "⏳ Authenticating to GitLab"
+#echo $GITLAB_TOKEN | glab auth login --hostname gitlab.app.betfair --stdin
+
+#echo "⏳ Adding public key to GitLab"
+# glab ssh-key add $SSH_PATH/gitlab_id_work.pub --title "$(hostname)" # TODO: 401 unauthorized
+
+
+################################################################################
+#                                Clone Projects                                #
+################################################################################
+
+echo "⏳ Copying configuration files"
+cp ".gitconfig_work" "$HOME/.gitconfig_work"
+
+# Common Directories
+WORKSPACES_DIR="$HOME/Projects/work/workspaces"
+STRANDS_DIR="$WORKSPACES_DIR/strands"
+
+# PP Workspaces Directories
+PP_DIR="$WORKSPACES_DIR/PP"
+PP_CMS_DIR="$PP_DIR/CMS"
+PP_DESIGN_SYSTEM_DIR="$PP_DIR/design-system"
+PP_COOKBOOKS_DIR="$PP_DIR/cookbooks"
+
+# Betfair Workspaces Directories
+BETFAIR_DIR="$WORKSPACES_DIR/Betfair"
+BETFAIR_COOKBOOKS_DIR="$BETFAIR_DIR/cookbooks"
+
+echo "⏳ Creating workspaces"
+mkdir -p "$STRANDS_DIR"
+mkdir -p "$PP_DIR"
+mkdir -p "$PP_CMS_DIR"
+mkdir -p "$PP_DESIGN_SYSTEM_DIR"
+mkdir -p "$PP_COOKBOOKS_DIR"
+mkdir -p "$BETFAIR_DIR"
+mkdir -p "$BETFAIR_COOKBOOKS_DIR"
+
+# Common
+git clone git@github.com:freitass-ppb/dotfiles.git "$WORKSPACES_DIR/dotfiles"
+git clone git@github.com:Flutter-Global/fabric-workspaces.git "$WORKSPACES_DIR/fabric-workspaces"
+git clone git@github.com:Flutter-Global/uki-channels-http-clients.git "$WORKSPACES_DIR/uki-channels-http-clients"
+git clone git@github.com:Flutter-Global/org-config.git "$WORKSPACES_DIR/org-config"
+git clone git@github.com:Flutter-Global/ppb-channels-sdk.git "$WORKSPACES_DIR/ppb-channels-sdk"
+git clone git@github.com:Flutter-Global/prismic-tools.git "$WORKSPACES_DIR/prismic-tools"
+
+git clone git@gitlab.app.betfair:aggregations/ppsb-http-navigation.git "$STRANDS_DIR/ppsb-http-navigation" 
+git clone git@gitlab.app.betfair:aggregations/ppweb-http-application-context.git "$STRANDS_DIR/ppweb-http-application-context"
+git clone git@gitlab.app.betfair:aggregations/ppweb-http-content-managed-page.git "$STRANDS_DIR/ppweb-http-content-managed-page"
+git clone git@gitlab.app.betfair:aggregations/ppweb-http-event-page.git "$STRANDS_DIR/ppweb-http-event-page"
+git clone git@gitlab.app.betfair:pp-sportsbook-web/docker-strands.git "$STRANDS_DIR/docker-strands"
+
+# PP
+git clone git@github.com:Flutter-Global/ppsb-web.git "$PP_DIR/ppsb-web"
+git clone git@github.com:Flutter-Global/ppsb-platform.git "$PP_DIR/ppsb-platform"
+git clone git@github.com:Flutter-Global/ppsb-graphql-pub.git "$PP_DIR/ppsb-graphql-pub"
+git clone git@github.com:Flutter-Global/ppsb-prismic-models.git "$PP_DIR/ppsb-prismic-models"
+git clone git@gitlab.app.betfair:pp-sportsbook-web/ppweb-primary-markets.git "$PP_DIR/ppweb-primary-markets"
+git clone git@gitlab.app.betfair:exchange-components/betslip.git "$PP_DIR/betslip"
+git clone git@gitlab.app.betfair:pp-sportsbook-web/bet-tracker.git "$PP_DIR/bet-tracker"
+git clone git@gitlab.app.betfair:pp-sportsbook-web/ppbf-sb-platform.git "$PP_DIR/ppbf-sb-platform"
+
+git clone git@gitlab.app.betfair:gin/rum-keg.git "$PP_CMS_DIR/rum-keg"
+git clone git@gitlab.app.betfair:gin/fcn-spa-gin.git "$PP_CMS_DIR/fcn-spa-gin"
+git clone git@gitlab.app.betfair:gin/fcn-gin-rum.git "$PP_CMS_DIR/fcn-gin-rum"
+
+git clone git@github.com:Flutter-Global/ppsb-abacus.git "$PP_DESIGN_SYSTEM_DIR/ppsb-abacus"
+git clone git@github.com:Flutter-Global/abacus-design-tokens.git "$PP_DESIGN_SYSTEM_DIR/abacus-design-tokens"
+git clone git@github.com:Flutter-Global/design-tokens.git "$PP_DESIGN_SYSTEM_DIR/design-tokens"
+git clone git@github.com:Flutter-Global/action-fetch-figma-assets.git "$PP_DESIGN_SYSTEM_DIR/action-fetch-figma-assets"
+
+git clone git@gitlab.app.betfair:chef-cookbooks/ppsms-static-client.git "$PP_COOKBOOKS_DIR/ppsms-static-client"
+git clone git@gitlab.app.betfair:chef-cookbooks/smsiospp.git "$PP_COOKBOOKS_DIR/smsiospp"
+git clone git@gitlab.app.betfair:chef-cookbooks/fcn-gin-ice.git "$PP_COOKBOOKS_DIR/fcn-gin-ice"
+git clone git@gitlab.app.betfair:chef-cookbooks/fcn-gin-rum.git "$PP_COOKBOOKS_DIR/fcn-gin-rum"
+git clone git@gitlab.app.betfair:chef-cookbooks/fcn-spa-gin.git "$PP_COOKBOOKS_DIR/fcn-spa-gin"
+
+# Betfair
+git clone git@github.com:Flutter-Global/tbd.git "$BETFAIR_DIR/tbd"
+git clone git@github.com:Flutter-Global/tbd-bff.git "$BETFAIR_DIR/tbd-bff"
+git clone git@github.com:Flutter-Global/tbd-prismic-custom-type.git "$BETFAIR_DIR/tbd-prismic-custom-type"
+
+git clone git@github.com:Flutter-Global/tbd-native-chef.git "$BETFAIR_COOKBOOKS_DIR/tbd-native-chef"
+git clone git@github.com:Flutter-Global/tbd-web-chef.git "$BETFAIR_COOKBOOKS_DIR/tbd-web-chef"
+
+echo "✅ Root repos installed"
+
+#echo "⏳ Extending zshrc with work configurations"
+#cd "$WORKSPACES_DIR/dotfiles"
+#cat .zshrc >> "$HOME/.zshrc"
+#touch "$HOME/.npmrc"
+#cat .npmrc >> "$HOME/.npmrc"
+
+printf "🎉 Setup complete! Here are some reminders:
+  - Reload zsh with 'source ~/.zshrc' or restart your terminal to see all changes applied
+  - You may need to restart your IDE or your computer to see all changes applied
+"
